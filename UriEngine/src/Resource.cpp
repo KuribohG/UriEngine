@@ -15,7 +15,6 @@ namespace UriEngine
 			IID_PPV_ARGS(&m_pResource)));
 	}
 
-
 	ID3D12Resource *CResource::GetResource()
 	{
 		return m_pResource;
