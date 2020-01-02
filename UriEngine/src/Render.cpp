@@ -4,6 +4,7 @@
 #include <cstdio>
 #include "d3dx12.h"
 #include <chrono>
+#include "Device.h"
 
 namespace UriEngine
 {
@@ -71,6 +72,8 @@ namespace UriEngine
 		printf("Video Memory: %I64u\n", maxVideoMemory);
 
 		ThrowIfFailed(D3D12CreateDevice(m_pDxgiAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice)));
+		g_pDevice = m_pDevice.Get();
+
 		if (enableDebugLayer)
 		{
 			ComPtr<ID3D12InfoQueue> pInfoQueue;
