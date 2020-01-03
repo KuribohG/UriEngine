@@ -1,13 +1,12 @@
 #include "Device.h"
 #include "Utils.h"
+#include "Config.h"
 
 namespace UriEngine
-{
-	ID3D12Device2 *g_pDevice;
-	
+{	
 	CDevice::CDevice()
 	{
-		bool enableDebugLayer = true;
+		bool enableDebugLayer = CConfig::GetInstance().GetEnableDebugLayer();
 
 		UINT createFactoryFlags = 0;
 		if (enableDebugLayer)
@@ -20,8 +19,7 @@ namespace UriEngine
 			debugInterface->EnableDebugLayer();
 		}
 
-		ComPtr<IDXGIAdapter1> dxgiAdapter;
-		ComPtr<IDXGIAdapter4> dxgiAdapter4;
+		IDXGIAdapter1 *dxgiAdapter;
 		SIZE_T maxVideoMemory = 0;
 		for (UINT i = 0; m_pDxgiFactory->EnumAdapters1(i, &dxgiAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
 		{
@@ -29,24 +27,21 @@ namespace UriEngine
 			dxgiAdapter->GetDesc1(&dxgiAdapterDesc);
 
 			if ((dxgiAdapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
-				SUCCEEDED(D3D12CreateDevice(dxgiAdapter.Get(),
+				SUCCEEDED(D3D12CreateDevice(dxgiAdapter,
 					D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)) &&
 				dxgiAdapterDesc.DedicatedVideoMemory > maxVideoMemory)
 			{
 				maxVideoMemory = dxgiAdapterDesc.DedicatedVideoMemory;
-				ThrowIfFailed(dxgiAdapter.As(&dxgiAdapter4));
+				ThrowIfFailed(dxgiAdapter->QueryInterface(IID_PPV_ARGS(&m_pDxgiAdapter)));
 			}
 		}
-		m_pDxgiAdapter = dxgiAdapter4.Get();
 
-		ComPtr<ID3D12Device2> pDevice;
-		ThrowIfFailed(D3D12CreateDevice(m_pDxgiAdapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pDevice)));
-		m_pDevice = pDevice.Get();
+		ThrowIfFailed(D3D12CreateDevice(m_pDxgiAdapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice)));
 
 		if (enableDebugLayer)
 		{
-			ComPtr<ID3D12InfoQueue> pInfoQueue;
-			if (SUCCEEDED(pDevice.As(&pInfoQueue)))
+			ID3D12InfoQueue *pInfoQueue;
+			if (SUCCEEDED(m_pDevice->QueryInterface(IID_PPV_ARGS(&pInfoQueue))))
 			{
 				pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
 				pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
@@ -76,6 +71,13 @@ namespace UriEngine
 				ThrowIfFailed(pInfoQueue->PushStorageFilter(&NewFilter));
 			}
 		}
+	}
+
+	CDevice::~CDevice()
+	{
+		//SAFE_DELETE(m_pDevice);
+		//SAFE_DELETE(m_pDxgiFactory);
+		//SAFE_DELETE(m_pDxgiAdapter);
 	}
 
 	CDevice& CDevice::GetInstance()

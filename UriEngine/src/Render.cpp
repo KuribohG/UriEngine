@@ -5,13 +5,12 @@
 #include "d3dx12.h"
 #include <chrono>
 #include "Device.h"
+#include "Config.h"
 
 namespace UriEngine
 {
 	CRender::CRender()
 	{
-		m_pDxgiFactory = nullptr;
-		m_pDxgiAdapter = nullptr;
 		m_pDevice = nullptr;
 
 		m_pCommandQueue = nullptr;
@@ -39,74 +38,8 @@ namespace UriEngine
 
 	void CRender::CreateRenderWindow(HWND hwnd)
 	{
-		bool enableDebugLayer = true;
-
-		UINT createFactoryFlags = 0;
-		if (enableDebugLayer)
-			createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
-		ThrowIfFailed(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&m_pDxgiFactory)));
-		if (enableDebugLayer)
-		{
-			ComPtr<ID3D12Debug> debugInterface;
-			ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
-			debugInterface->EnableDebugLayer();
-		}
-
-		ComPtr<IDXGIAdapter1> dxgiAdapter;
-		SIZE_T maxVideoMemory = 0;
-		for (UINT i = 0; m_pDxgiFactory->EnumAdapters1(i, &dxgiAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
-		{
-			DXGI_ADAPTER_DESC1 dxgiAdapterDesc;
-			dxgiAdapter->GetDesc1(&dxgiAdapterDesc);
-
-			if ((dxgiAdapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
-				SUCCEEDED(D3D12CreateDevice(dxgiAdapter.Get(),
-					D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)) &&
-				dxgiAdapterDesc.DedicatedVideoMemory > maxVideoMemory)
-			{
-				maxVideoMemory = dxgiAdapterDesc.DedicatedVideoMemory;
-				ThrowIfFailed(dxgiAdapter.As(&m_pDxgiAdapter));
-			}
-		}
-
-		printf("Video Memory: %I64u\n", maxVideoMemory);
-
-		ThrowIfFailed(D3D12CreateDevice(m_pDxgiAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDevice)));
-		g_pDevice = m_pDevice.Get();
-
-		if (enableDebugLayer)
-		{
-			ComPtr<ID3D12InfoQueue> pInfoQueue;
-			if (SUCCEEDED(m_pDevice.As(&pInfoQueue)))
-			{
-				pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-				pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
-				pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
-				
-				D3D12_MESSAGE_SEVERITY Severities[] =
-				{
-					D3D12_MESSAGE_SEVERITY_INFO
-				};
-
-				// Suppress individual messages by their ID
-				D3D12_MESSAGE_ID DenyIds[] = {
-					D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,   // I'm really not sure how to avoid this message.
-					D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                         // This warning occurs when using capture frame while graphics debugging.
-					D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                       // This warning occurs when using capture frame while graphics debugging.
-				};
-
-
-				D3D12_INFO_QUEUE_FILTER NewFilter = {};
-				//NewFilter.DenyList.NumCategories = _countof(Categories);
-				//NewFilter.DenyList.pCategoryList = Categories;
-				NewFilter.DenyList.NumSeverities = _countof(Severities);
-				NewFilter.DenyList.pSeverityList = Severities;
-				NewFilter.DenyList.NumIDs = _countof(DenyIds);
-				NewFilter.DenyList.pIDList = DenyIds;
-
-				ThrowIfFailed(pInfoQueue->PushStorageFilter(&NewFilter));
-			}
-		}
+		m_pDevice = CDevice::GetInstance().GetDevice();
+		m_pDxgiFactory = CDevice::GetInstance().GetDxgiFactory();
 
 		D3D12_COMMAND_QUEUE_DESC commandQueueDesc = {};
 		commandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -115,7 +48,7 @@ namespace UriEngine
 		commandQueueDesc.NodeMask = 0;
 		ThrowIfFailed(m_pDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&m_pCommandQueue)));
 
-		ComPtr<IDXGISwapChain1> swapChain;
+		IDXGISwapChain1 *swapChain;
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 		swapChainDesc.Width = 1920;
 		swapChainDesc.Height = 1080;
@@ -128,13 +61,13 @@ namespace UriEngine
 		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 		swapChainDesc.Flags = 0; // DXGI_PRESENT_ALLOW_TEARING
-		ThrowIfFailed(m_pDxgiFactory->CreateSwapChainForHwnd(m_pCommandQueue.Get(),
+		ThrowIfFailed(m_pDxgiFactory->CreateSwapChainForHwnd(m_pCommandQueue,
 			hwnd,
 			&swapChainDesc,
 			nullptr,
 			nullptr,
 			&swapChain));
-		ThrowIfFailed(swapChain.As(&m_pSwapChain));
+		ThrowIfFailed(swapChain->QueryInterface(IID_PPV_ARGS(&m_pSwapChain)));
 
 		D3D12_DESCRIPTOR_HEAP_DESC rtvDescriptorHeapDesc = {};
 		rtvDescriptorHeapDesc.NumDescriptors = NUM_FRAMEBUFFERS;
@@ -145,9 +78,9 @@ namespace UriEngine
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_pRtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 		for (int i = 0; i < NUM_FRAMEBUFFERS; i++)
 		{
-			ComPtr<ID3D12Resource> backBuffer;
+			ID3D12Resource *backBuffer;
 			ThrowIfFailed(m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
-			m_pDevice->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
+			m_pDevice->CreateRenderTargetView(backBuffer, nullptr, rtvHandle);
 			m_pBackBuffers[i] = backBuffer;
 			rtvHandle.Offset(rtvDescriptorSize);
 		}
@@ -159,7 +92,7 @@ namespace UriEngine
 		int currentBackBufferIdx = m_pSwapChain->GetCurrentBackBufferIndex();
 		ThrowIfFailed(m_pDevice->CreateCommandList(0,
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			m_pCommandAllocators[currentBackBufferIdx].Get(),
+			m_pCommandAllocators[currentBackBufferIdx],
 			nullptr,
 			IID_PPV_ARGS(&m_pCommandList)));
 		ThrowIfFailed(m_pCommandList->Close());
@@ -171,7 +104,7 @@ namespace UriEngine
 	uint64_t CRender::Signal()
 	{
 		++m_fenceValue;
-		ThrowIfFailed(m_pCommandQueue->Signal(m_pFence.Get(), m_fenceValue));
+		ThrowIfFailed(m_pCommandQueue->Signal(m_pFence, m_fenceValue));
 		return m_fenceValue;
 	}
 
@@ -191,10 +124,10 @@ namespace UriEngine
 		WaitForFenceValue(m_frameFenceValues[backBufferIdx]);
 
 		m_pCommandAllocators[backBufferIdx]->Reset();
-		m_pCommandList->Reset(m_pCommandAllocators[backBufferIdx].Get(), nullptr);
+		m_pCommandList->Reset(m_pCommandAllocators[backBufferIdx], nullptr);
 
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_pBackBuffers[backBufferIdx].Get(),
+			m_pBackBuffers[backBufferIdx],
 			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		m_pCommandList->ResourceBarrier(1, &barrier);
 	}
@@ -202,14 +135,14 @@ namespace UriEngine
 	void CRender::Present()
 	{
 		auto prevBackBufferIdx = m_pSwapChain->GetCurrentBackBufferIndex();
-		printf("%d\n", prevBackBufferIdx);
+		//printf("%d\n", prevBackBufferIdx);
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_pBackBuffers[prevBackBufferIdx].Get(),
+			m_pBackBuffers[prevBackBufferIdx],
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		m_pCommandList->ResourceBarrier(1, &barrier);
 		ThrowIfFailed(m_pCommandList->Close());
 
-		auto commandList = (ID3D12CommandList*)m_pCommandList.Get();
+		auto commandList = (ID3D12CommandList*)m_pCommandList;
 		m_pCommandQueue->ExecuteCommandLists(1, &commandList);
 		m_frameFenceValues[prevBackBufferIdx] = Signal();
 

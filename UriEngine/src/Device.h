@@ -11,7 +11,8 @@ namespace UriEngine
 	{
 	public:
 		static CDevice &GetInstance();
-		ID3D12Device2 *GetDevice();
+		ID3D12Device2 *GetDevice() { return m_pDevice; }
+		IDXGIFactory4 *GetDxgiFactory() { return m_pDxgiFactory; }
 	private:
 		CDevice();
 		~CDevice();

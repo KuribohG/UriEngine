@@ -21,20 +21,19 @@ namespace UriEngine
 		void Present();
 		void ClearRenderTargetView(float *values);
 	private:
-		ComPtr<IDXGIFactory4> m_pDxgiFactory;
-		ComPtr<IDXGIAdapter4> m_pDxgiAdapter;
-		ComPtr<ID3D12Device2> m_pDevice;
+		ID3D12Device2 *m_pDevice;
+		IDXGIFactory4 *m_pDxgiFactory;
 
-		ComPtr<ID3D12CommandQueue> m_pCommandQueue;
-		ComPtr<IDXGISwapChain4> m_pSwapChain;
+		ID3D12CommandQueue *m_pCommandQueue;
+		IDXGISwapChain4 *m_pSwapChain;
 
-		ComPtr<ID3D12DescriptorHeap> m_pRtvDescriptorHeap;
-		ComPtr<ID3D12Resource> m_pBackBuffers[NUM_FRAMEBUFFERS];
+		ID3D12DescriptorHeap *m_pRtvDescriptorHeap;
+		ID3D12Resource *m_pBackBuffers[NUM_FRAMEBUFFERS];
 
-		ComPtr<ID3D12CommandAllocator> m_pCommandAllocators[NUM_FRAMEBUFFERS];
-		ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
+		ID3D12CommandAllocator *m_pCommandAllocators[NUM_FRAMEBUFFERS];
+		ID3D12GraphicsCommandList *m_pCommandList;
 
-		ComPtr<ID3D12Fence> m_pFence;
+		ID3D12Fence *m_pFence;
 		HANDLE m_fenceEvent;
 		uint64_t m_fenceValue;
 		uint64_t m_frameFenceValues[NUM_FRAMEBUFFERS];
