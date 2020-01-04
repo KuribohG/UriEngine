@@ -36,4 +36,9 @@ namespace UriEngine
 	{
 		return m_CurrentState;
 	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS CResource::GetGPUVirtualAddress()
+	{
+		return m_pResource->GetGPUVirtualAddress();
+	}
 }

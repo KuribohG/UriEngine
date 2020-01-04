@@ -29,6 +29,9 @@ namespace UriEngine
 		m_fenceValue = 0;
 		for (int i = 0; i < NUM_FRAMEBUFFERS; i++)
 			m_frameFenceValues[i] = 0;
+
+		for (int i = 0; i < MAX_VERTEX_BUFFERS; i++)
+			m_pVertexBufferViews[i] = nullptr;
 	}
 
 	CRender::~CRender()
@@ -156,5 +159,43 @@ namespace UriEngine
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(m_pRtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 			backBufferIdx, m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
 		m_pCommandList->ClearRenderTargetView(rtv, values, 0, nullptr);
+	}
+
+	void CRender::SetVertexBufferView(uint32_t slot, CVertexBufferView *view)
+	{
+		m_pVertexBufferViews[slot] = view;
+	}
+
+	void CRender::SetIndexBufferView(CIndexBufferView *view)
+	{
+		m_pIndexBufferView = view;
+	}
+
+	void CRender::BindVbIb()
+	{
+		for (int i = 0; i < MAX_VERTEX_BUFFERS; i++)
+			if (m_pVertexBufferViews[i])
+				m_pCommandList->IASetVertexBuffers(i, 1, &m_pVertexBufferViews[i]->GetView());
+		
+		if (m_pIndexBufferView)
+			m_pCommandList->IASetIndexBuffer(&m_pIndexBufferView->GetView());
+	}
+
+	void CRender::BindResources()
+	{
+
+	}
+
+	void CRender::BindPSO()
+	{
+
+	}
+	
+	void CRender::DrawIndexed(uint32_t IndexCount, uint32_t StartIndexLocation, int BaseVertexLocation)
+	{
+		BindVbIb();
+		BindResources();
+		BindPSO();
+		m_pCommandList->DrawIndexedInstanced(IndexCount, 1, StartIndexLocation, BaseVertexLocation, 0);
 	}
 }

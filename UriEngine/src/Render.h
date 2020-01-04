@@ -4,10 +4,12 @@
 #include <dxgi1_6.h>
 #include <d3d12.h>
 #include <cstdint>
+#include "View.h"
 
 namespace UriEngine
 {
 	constexpr int NUM_FRAMEBUFFERS = 3;
+	constexpr uint32_t MAX_VERTEX_BUFFERS = 16;
 
 	class CRender
 	{
@@ -20,7 +22,14 @@ namespace UriEngine
 		void BeginFrame();
 		void Present();
 		void ClearRenderTargetView(float *values);
+		void SetVertexBufferView(uint32_t slot, CVertexBufferView *view);
+		void SetIndexBufferView(CIndexBufferView *view);
+		void DrawIndexed(uint32_t IndexCount, uint32_t StartIndexLocation = 0, int BaseVertexLocation = 0);
 	private:
+		void BindVbIb();
+		void BindResources();
+		void BindPSO();
+
 		ID3D12Device2 *m_pDevice;
 		IDXGIFactory4 *m_pDxgiFactory;
 
@@ -37,5 +46,8 @@ namespace UriEngine
 		HANDLE m_fenceEvent;
 		uint64_t m_fenceValue;
 		uint64_t m_frameFenceValues[NUM_FRAMEBUFFERS];
+
+		CVertexBufferView *m_pVertexBufferViews[MAX_VERTEX_BUFFERS];
+		CIndexBufferView *m_pIndexBufferView;
 	};
 }
